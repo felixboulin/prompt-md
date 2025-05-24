@@ -18,6 +18,21 @@ def inject(markdown_path: Path) -> str:
 
     def replace(match):
         expr = match.group(1).strip()
+        COMMENT_PREFIX = {
+            "py": "#",
+            "js": "//",
+            "ts": "//",
+            "json": "//",
+            "sh": "#",
+            "bash": "#",
+            "html": "<!--",
+            "css": "/*",
+            "yml": "#",
+            "yaml": "#",
+            "sql": "--",
+            "toml": "#",
+        }
+
         if expr.startswith("tree"):
             if ";" in expr or "&&" in expr:
                 raise ValueError(
@@ -25,7 +40,6 @@ def inject(markdown_path: Path) -> str:
                 )
             try:
                 logging.info(f"Running shell command: {expr}")
-                # Safer split
                 cmd = shlex.split(expr)
                 result = subprocess.run(
                     cmd,
@@ -42,14 +56,29 @@ def inject(markdown_path: Path) -> str:
                 logging.exception("Unexpected error running shell command")
                 content = f"*ERROR running command `{expr}`: {e}*"
             return f"```bash\n$ {expr}\n{content.rstrip()}\n```"
+
         else:
             target = parent_of_md / expr
             if not target.exists():
                 logging.warning(f"File not found: {target}")
                 content = f"*ERROR: {expr} not found*"
+                return f"```txt\n# Missing file: {expr}\n{content.rstrip()}\n```"
+
+            content = target.read_text(encoding="utf-8")
+            ext = Path(expr).suffix.lstrip(".") or "txt"
+            prefix = COMMENT_PREFIX.get(ext, "#")
+
+            # Get the relative path again for LLM context
+            rel_path = str(Path(expr))  # keep path as written in {{ ... }}
+
+            if prefix == "<!--":
+                comment = f"{prefix} File: {rel_path} -->"
+            elif prefix == "/*":
+                comment = f"{prefix} File: {rel_path} */"
             else:
-                content = target.read_text(encoding="utf-8")
-        return f"```{expr}\n{content.rstrip()}\n```"
+                comment = f"{prefix} File: {rel_path}"
+
+            return f"```{ext}\n{comment}\n{content.rstrip()}\n```"
 
     # Split text into segments inside and outside code fences
     parts = CODE_FENCE_RE.split(text)
