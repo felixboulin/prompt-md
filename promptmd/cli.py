@@ -9,7 +9,7 @@ except ImportError:
     pyperclip = None
 
 from .core import inject
-from .call_openai_api import call_openai_api
+from .api_utils import call_openai_api, call_anthropic_api
 
 
 def main():
@@ -25,6 +25,8 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("mdfile", type=Path)
     p.add_argument("--send", action="store_true")
+    p.add_argument("--provider", choices=["openai", "anthropic"], default="openai")
+    p.add_argument("--model", help="Override default model for the chosen provider")
     args = p.parse_args()
 
     result = inject(args.mdfile)
@@ -37,7 +39,10 @@ def main():
     if args.send:
         print("sending ..")
         try:
-            answer = call_openai_api(result)
+            if args.provider == "anthropic":
+                answer = call_anthropic_api(result)
+            else:
+                answer = call_openai_api(result)
         except Exception as e:
             print(f"❌ Failed to send prompt: {e}")
             return
