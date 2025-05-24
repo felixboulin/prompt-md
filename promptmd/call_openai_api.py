@@ -1,5 +1,6 @@
 import os
 import requests
+import logging
 
 
 def call_openai_api(prompt: str, model: str = "gpt-4o") -> str:
@@ -27,16 +28,22 @@ def call_openai_api(prompt: str, model: str = "gpt-4o") -> str:
         "temperature": 0.7,
     }
 
-    response = requests.post(
-        "https://api.openai.com/v1/chat/completions",
-        headers=headers,
-        json=payload,
-        timeout=60,
-    )
+    try:
+        response = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=60,
+        )
+    except requests.exceptions.RequestException as e:
+        logging.error("Network error when calling OpenAI API", exc_info=True)
+        raise RuntimeError(f"❌ Network error: {e}")
 
     if not response.ok:
+        logging.error(f"OpenAI API error: {response.status_code}\n{response.text}")
         raise RuntimeError(
-            f"OpenAI API error: {response.status_code} - {response.text}"
+            f"❌ Request to OpenAI failed with status {response.status_code}.\n"
+            f"Details: {response.text.strip()[:300]}..."  # truncate long errors
         )
 
     return response.json()["choices"][0]["message"]["content"]

@@ -1,5 +1,7 @@
 import argparse
 from pathlib import Path
+import logging
+
 
 try:
     import pyperclip
@@ -14,6 +16,11 @@ def main():
     from dotenv import load_dotenv
 
     load_dotenv()
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
+    )
 
     p = argparse.ArgumentParser()
     p.add_argument("mdfile", type=Path)
