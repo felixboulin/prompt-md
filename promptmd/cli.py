@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 import logging
+from .model_config import MODEL_CONFIG
 
 
 try:
@@ -9,7 +10,13 @@ except ImportError:
     pyperclip = None
 
 from .core import inject
+
 from .api_utils import call_openai_api, call_anthropic_api
+
+CALL_API_FN = {
+    "openai": call_openai_api,
+    "anthropic": call_anthropic_api,
+}
 
 
 def main():
@@ -26,6 +33,9 @@ def main():
     p.add_argument("mdfile", type=Path)
     p.add_argument("--send", action="store_true")
     p.add_argument("--provider", choices=["openai", "anthropic"], default="openai")
+    p.add_argument(
+        "--level", choices=["small", "medium", "large", "default"], default="default"
+    )
     p.add_argument("--model", help="Override default model for the chosen provider")
     args = p.parse_args()
 
@@ -39,10 +49,12 @@ def main():
     if args.send:
         print("sending ..")
         try:
-            if args.provider == "anthropic":
-                answer = call_anthropic_api(result)
-            else:
-                answer = call_openai_api(result)
+            model = args.model or MODEL_CONFIG[args.provider][args.level]
+            api_fn = CALL_API_FN.get(args.provider)
+            if not api_fn:
+                raise RuntimeError(f"❌ Unsupported provider: {args.provider}")
+            answer = api_fn(result, model=model)
+
         except Exception as e:
             print(f"❌ Failed to send prompt: {e}")
             return

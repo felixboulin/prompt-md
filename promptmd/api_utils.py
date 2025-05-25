@@ -6,11 +6,29 @@ OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_VERSION = "2023-06-01"
 
-_SYSTEM_PROMPT = (
-    "You are an expert programmer answering code questions from collaborators. "
-    "In all your replies, wrap code in markdown code fences that include the "
-    "file extension for syntax highlighting."
-)
+_SYSTEM_PROMPT = """
+    You are an expert programmer answering code questions from collaborators. 
+    In all your replies, wrap code in markdown code fences that include the 
+    file extension for syntax highlighting.
+    You only provide the relevant surgical pieces of code change required
+    to answer the question with clear way of identifying the location of the 
+    change in a code file.
+    """
+
+MODEL_CONFIG = {
+    "openai": {
+        "small": "gpt-4.1-mini",
+        "medium": "gpt-4o",
+        "large": "gpt-4.1",
+        "default": "gpt-4.1",
+    },
+    "anthropic": {
+        "small": "claude-3-5-haiku-latest",
+        "medium": "claude-3-5-haiku-latest",
+        "large": "claude-sonnet-4-20250514",
+        "default": "claude-sonnet-4-20250514",
+    },
+}
 
 
 def get_api_key(env_var_name: str) -> str:
