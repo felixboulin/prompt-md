@@ -8,15 +8,23 @@ import shlex
 CODE_FENCE_RE = re.compile(r"(```.*?```)", re.DOTALL)
 
 
-def inject(markdown_path: Path) -> str:
+def inject(markdown_path: Path, seen: set = None) -> str:
     abs_path = str(markdown_path.resolve())
     if not markdown_path.exists():
         logging.error(f"❌ Input markdown file not found: {abs_path}")
         raise FileNotFoundError(f"{markdown_path} does not exist")
+
+    if seen is None:
+        seen = set()
+    if markdown_path in seen:
+        raise ValueError(f"❌ Circular include detected: {markdown_path}")
+    seen.add(markdown_path)
+
     text = markdown_path.read_text(encoding="utf-8")
     parent_of_md = markdown_path.parent.parent
+    current_folder = markdown_path.parent
 
-    def replace(match):
+    def replace(match, seen=seen):
         expr = match.group(1).strip()
         COMMENT_PREFIX = {
             "py": "#",
@@ -33,7 +41,20 @@ def inject(markdown_path: Path) -> str:
             "toml": "#",
         }
 
-        if expr.startswith("tree"):
+        if expr.startswith("include"):
+            included_file = expr.split("include", 1)[1].strip()
+            include_path = current_folder / included_file
+            if not include_path.exists():
+                logging.error(f"❌ Included file not found: {include_path}")
+                return f"```txt\n# ERROR: Included file not found: {included_file}\n```"
+            try:
+                # Recursively inject the included file
+                return inject(include_path, seen=seen)
+            except Exception as e:
+                logging.exception(f"Error including file: {include_path}")
+                return f"```txt\n# ERROR: Failed to include {included_file}: {e}\n```"
+
+        elif expr.startswith("tree"):
             if ";" in expr or "&&" in expr:
                 raise ValueError(
                     "⚠️  Unsafe shell command blocked: chaining is not allowed."
@@ -85,5 +106,8 @@ def inject(markdown_path: Path) -> str:
     for idx, part in enumerate(parts):
         # Even indexes are outside code fences
         if idx % 2 == 0:
-            parts[idx] = re.sub(r"\{\{\s*(.*?)\s*\}\}", replace, part)
+            # lambda function: closure
+            parts[idx] = re.sub(
+                r"\{\{\s*(.*?)\s*\}\}", lambda m: replace(m, seen), part
+            )
     return "".join(parts)
