@@ -48,22 +48,12 @@ def send_request(url: str, headers: dict, payload: dict, timeout: int) -> dict:
     return response.json()
 
 
-def handle_response(response: dict, api_name: str) -> str:
-    if "choices" in response:
-        return response["choices"][0]["message"]["content"]
-    elif "content" in response:
-        return response["content"][0]["text"]
-    else:
-        logging.error(f"{api_name} API error: unexpected response format")
-        raise RuntimeError(f"❌ {api_name} API returned unexpected response format.")
-
-
 def call_anthropic_api(
     prompt: str,
     model: str = "claude-sonnet-4-20250514",
-    max_tokens: int = 4096,
+    max_tokens: int = 1024,
     temperature: float = 0.7,
-) -> str:
+) -> tuple[str, dict]:
     api_key = get_api_key("ANTHROPIC_API_KEY")
 
     headers = {
@@ -80,10 +70,16 @@ def call_anthropic_api(
         "temperature": temperature,
     }
     response = send_request(ANTHROPIC_URL, headers, payload, timeout=90)
-    return handle_response(response, "Anthropic")
+    return {
+        "content": response["content"][0]["text"],
+        "input_tokens": response.get("usage", {}).get("input_tokens"),
+        "output_tokens": response.get("usage", {}).get("output_tokens"),
+    }
+
+    return content, usage
 
 
-def call_openai_api(prompt: str, model: str = "gpt-4.1") -> str:
+def call_openai_api(prompt: str, model: str = "gpt-4.1") -> tuple[str, dict]:
     api_key = get_api_key("OPENAI_API_KEY")
 
     headers = {
@@ -101,4 +97,8 @@ def call_openai_api(prompt: str, model: str = "gpt-4.1") -> str:
     }
 
     response = send_request(OPENAI_URL, headers, payload, timeout=60)
-    return handle_response(response, "OpenAI")
+    return {
+        "content": response["choices"][0]["message"]["content"],
+        "input_tokens": response.get("usage", {}).get("prompt_tokens"),
+        "output_tokens": response.get("usage", {}).get("completion_tokens"),
+    }
